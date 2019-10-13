@@ -135,5 +135,5 @@
 
 ; Ex.4 history answer
 (define (history-answer history)
-  (append '(earlier you said that) (pick-random history))
+  (append '(earlier you said that) (change-person (pick-random history)))
 )
