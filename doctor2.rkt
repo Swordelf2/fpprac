@@ -48,11 +48,11 @@
 
 ; генерация ответной реплики по user-response -- реплике от пользователя 
 (define (reply user-response history)
-      (case (random (if (null? history) 2 3)) ; с равной вероятностью выбирается один из двух способов построения ответа
+      (case (random (if (contains-keyword user-response) 3 2)) ; с равной вероятностью выбирается один из двух способов построения ответа
                     ; (или 3-х если история непуста)
           ((0) (qualifier-answer user-response)) ; 1й способ
           ((1) (hedge))  ; 2й способ
-          ((2) (history-answer history)) ; 3й способ
+          ((2) (keyword-answer user-response)) ; 3й способ
       )
 )
 			
