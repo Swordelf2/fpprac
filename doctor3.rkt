@@ -88,7 +88,7 @@
                                ; Ex.1 phrases
                                (it seems as though)
                                (try to explain why)
-                               (what in your opinions is the reason that))
+                               (what in your opinion is the reason that))
                 )
                 (change-person user-response)
         )
