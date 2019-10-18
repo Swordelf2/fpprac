@@ -2,6 +2,7 @@
 #lang scheme/base
 ; В учебных целях используется базовая версия Scheme
 
+; функция запрашивает имя у пациента и возвращает его
 (define (ask-patient-name)
  (begin
   (println '(next!))
@@ -12,11 +13,12 @@
 )
 
 ; основная функция, запускающая "Доктора"
-; параметр name -- имя пациента
+; stop-word - стоп-слово, после ввода которого в качестве имени пациента программа завершается
+; max-patients - максимальное кол-во пациентов за время работы программы
 (define (visit-doctor stop-word max-patients)
   (let loop ((max-patients max-patients))
     (let ((name (ask-patient-name)))
-      (when (not (equal? name stop-word))
+      (when (not (eq? name stop-word))
         (begin
           (printf "Hello, ~a!\n" name)
           (print '(what seems to be the trouble?))
@@ -31,6 +33,7 @@
 
 ; цикл диалога Доктора с пациентом
 ; параметр name -- имя пациента
+; history - список всех предыдущих реплик пациента
 (define (doctor-driver-loop name history)
     (newline)
     (print '**) ; доктор ждёт ввода реплики пациента, приглашением к которому является **
@@ -48,36 +51,34 @@
 
 
 
+; выбор случайной стратегии среди strategies (с весами)
 (define (pick-random-with-weight strategies)
   ; compute sum of all weights in `sum`
   (let* ((sum (foldl (lambda (elem result) (+ result (cadr elem))) 0 strategies))
         (rand (random sum)))
-    ; foldl the strategies to find the first with sum > rand
-    (foldl
-     (lambda (elem result)
-             (if (integer? result)
-                 (let ((new-sum (+ result (cadr elem)))) 
-                   (if (> new-sum rand)
-                       elem
-                       new-sum
-                   )
-                 )
-                 result
-             )
-     )
-     0
-     strategies
+    ; loop over the strategies to find the first with sum > rand
+    (let loop ((lst strategies) (sum 0))
+      (let* ((elem (car lst))
+            (new-sum (+ sum (cadr elem))))
+        (if (> new-sum rand)
+            elem
+            (loop (cdr lst) new-sum)
+        )
+      )
     )
   )
 )
-                  
 
-; генерация ответной реплики по user-response -- реплике от пользователя 
+; генерация ответной реплики по user-response -- реплике пациента
+; history - список всех предыдущих реплик пациента
 (define (reply reply-strategies user-response history)
    (let ((strategy (pick-random-with-weight (filter (lambda (elem) ((car elem) user-response history)) reply-strategies))))
     ((caddr strategy) user-response history)
    )
 )
+
+; везде далее user-response - последняя реплика пациента
+; history - список всех предыдущих реплик пациента
 			
 ; 1й способ генерации ответной реплики -- замена лица в реплике пользователя и приписывание к результату нового начала
 (define (qualifier-answer user-response history)
@@ -195,6 +196,7 @@
 )
 
 ; Ex.6 keyword answer
+; user-response - реплика пациента
 ; construct a list of keywords in `user-response`
 ; pick a random element from that list: `keyword`
 ; unite all cadrs of elements of `keyword-data` whose car contains `keyword`

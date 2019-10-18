@@ -2,6 +2,7 @@
 #lang scheme/base
 ; В учебных целях используется базовая версия Scheme
 
+; функция запрашивает имя у пациента и возвращает его
 (define (ask-patient-name)
  (begin
   (println '(next!))
@@ -12,11 +13,12 @@
 )
 
 ; основная функция, запускающая "Доктора"
-; параметр name -- имя пациента
+; stop-word - стоп-слово, после ввода которого в качестве имени пациента программа завершается
+; max-patients - максимальное кол-во пациентов за время работы программы
 (define (visit-doctor stop-word max-patients)
   (let loop ((max-patients max-patients))
     (let ((name (ask-patient-name)))
-      (when (not (equal? name stop-word))
+      (when (not (eq? name stop-word))
         (begin
           (printf "Hello, ~a!\n" name)
           (print '(what seems to be the trouble?))
@@ -31,6 +33,7 @@
 
 ; цикл диалога Доктора с пациентом
 ; параметр name -- имя пациента
+; history - список всех предыдущих реплик пациента
 (define (doctor-driver-loop name history)
     (newline)
     (print '**) ; доктор ждёт ввода реплики пациента, приглашением к которому является **
@@ -46,14 +49,33 @@
       )
 )
 
-; генерация ответной реплики по user-response -- реплике от пользователя 
+; генерация ответной реплики по user-response -- реплике пациента
+; history - список всех предыдущих реплик пациента
 (define (reply user-response history)
-      (case (random (if (contains-keyword user-response) 3 2)) ; с равной вероятностью выбирается один из двух способов построения ответа
-                    ; (или 3-х если история непуста)
+  ; helper function which converts boolean to integer
+  (define (b2i bool)
+    (if (eq? bool #f)
+        0
+        1
+    )
+  )
+  (let* ((pred-history (not (null? history)))
+         (pred-keyword (contains-keyword user-response))
+         (rand (random (+ 2 (b2i pred-history) (b2i pred-keyword))))
+         (choice
+           (if (and (not pred-history) pred-keyword (eq? rand 2))
+               (+ rand 1)
+               rand
+           )
+         )
+        )
+        (case choice
           ((0) (qualifier-answer user-response)) ; 1й способ
           ((1) (hedge))  ; 2й способ
-          ((2) (keyword-answer user-response)) ; 3й способ
-      )
+          ((2) (history-answer history)) ; 3й способ
+          ((3) (keyword-answer user-response))
+        )
+    )
 )
 			
 ; 1й способ генерации ответной реплики -- замена лица в реплике пользователя и приписывание к результату нового начала
@@ -76,7 +98,7 @@
   (list-ref lst (random (length lst)))
 )
 
-; замена лица во фразе			
+; замена лица во фразе phrase
 (define (change-person phrase)
         (many-replace-higher '((am are)
                         (are am)
@@ -106,7 +128,7 @@
          )
   )
 
-; Ex.2 Iterative 'many-replace'
+; Ex.2 Iterative version of 'many-replace'
 (define (many-replace-iterative replacement-pairs lst)
   ; pop from lst, process and push onto result one-by-one
   ; then reverse result
@@ -153,11 +175,13 @@
 )
 
 ; Ex.4 history answer
+; history - список всех предыдущих реплик пациента
 (define (history-answer history)
   (append '(earlier you said that) (change-person (pick-random history)))
 )
 
 ; Ex.6 keyword answer
+; user-response - реплика пациента
 ; construct a list of keywords in `user-response`
 ; pick a random element from that list: `keyword`
 ; unite all cadrs of elements of `keyword-data` whose car contains `keyword`

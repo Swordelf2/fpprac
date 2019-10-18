@@ -11,7 +11,7 @@
 )
 
 ; цикл диалога Доктора с пациентом
-; параметр name -- имя пациента
+; name - имя пациента, history - список всех предыдущих реплик пациента
 (define (doctor-driver-loop name history)
     (newline)
     (print '**) ; доктор ждёт ввода реплики пациента, приглашением к которому является **
@@ -27,7 +27,8 @@
       )
 )
 
-; генерация ответной реплики по user-response -- реплике от пользователя 
+; генерация ответной реплики по user-response -- реплике пациента
+; history - список всех предыдущих реплик пациента
 (define (reply user-response history)
       (case (random (if (null? history) 2 3)) ; с равной вероятностью выбирается один из двух способов построения ответа
                     ; (или 3-х если история непуста)
@@ -38,6 +39,7 @@
 )
 			
 ; 1й способ генерации ответной реплики -- замена лица в реплике пользователя и приписывание к результату нового начала
+; user-response - реплика пациента
 (define (qualifier-answer user-response)
         (append (pick-random '((you seem to think that)
                                (you feel that)
@@ -57,7 +59,7 @@
   (list-ref lst (random (length lst)))
 )
 
-; замена лица во фразе			
+; замена лица во фразе phrase
 (define (change-person phrase)
         (many-replace-higher '((am are)
                         (are am)
@@ -87,7 +89,7 @@
          )
   )
 
-; Ex.2 Iterative 'many-replace'
+; Ex.2 Iterative version of 'many-replace'
 (define (many-replace-iterative replacement-pairs lst)
   ; pop from lst, process and push onto result one-by-one
   ; then reverse result
@@ -134,6 +136,7 @@
 )
 
 ; Ex.4 history answer
+; history - список всех предыдущих реплик пациента
 (define (history-answer history)
   (append '(earlier you said that) (change-person (pick-random history)))
 )
