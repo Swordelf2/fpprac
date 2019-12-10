@@ -166,6 +166,13 @@
   (set)
   1))
 
+(define test-board (board
+  (set '(1 1))
+  (set)
+  (set '(2 2))
+  (set)
+  1))
+
 ; TODO wins?
  
 ;; хэш-таблица для мемоизированной функции эвристичечкой оценки
@@ -242,64 +249,83 @@
   ; dir1 - в какую сторону по вертикали может двигаться фишка
   ; dir1 - (+1), (-1) или (+1 -1) (если дамка)
   (define (possible-moves-single-checker pos my-pieces enemy-pieces dir1)
-    (let* ((dirs (case dir
-                   [('(1)) '((1 -1) (1 1))]
-                   [('(-1)) '((-1 -1) (-1 1))]
-                   [('(-1 1)) '((-1 -1) (-1 1) (1 -1) (1 1))]))
-           ; перещаемся в каждом из возможных направлений dirs
-           (new-pos-list (foldl
-                (lambda (dir new-pos-list)
-                  (cons (move-in-dir pos dir) new-pos-list))
-                '()
-                dirs))
+      ; рекурсивная функция, возвращающая список всевозможных ходов в ниже указанном формате
+      ; kills-only - если #t то возвращаются только ходы со взятиями
+      (define (possible-moves-recursive pos dirs kills-only)
+        ; move-list - список всевозможных ходов из позиции pos в виде (end-pos kill1 kill2 ... )
+        (let ((move-list (foldl
+            (lambda (dir move-list)
+              (let* ((new-pos (move-in-dir pos dir)))
+                ; проверяем что позиция в пределах доски
+                (if (and (good-pos? new-pos))
+                  (cond 
+                    ; если в new-pos - фишка противника, то пробуем ее съесть
+                    [(set-member? enemy-pieces new-pos)
+                        (let ((new-pos2 (move-in-dir new-pos dir)))
+                          ; проверяем что результирующая клетка пустая
+                          (if (and (good-pos? new-pos2)
+                                   (not (set-member? my-pieces new-pos2))
+                                   (not (set-member? enemy-pieces new-pos2)))
+                            ; рекурсивно ищем все ходы из новой позиции только со взятиями
+                            (let ((later-moves (possible-moves-recursive new-pos2 dirs #t)))
+                              ; в каждом из них нужно извлечь cdr - список взятий и car - end-pos
+                              ; к взятиям нужно прибавить kill1 = new-pos, end-pos оставить неизменным
+                              ; и собрать обратно в список вида (end-pos kill1 kill2 ... )
+                              ; и в конце append-нуть все эти ходы к move-list
+                              (append (foldl
+                                (lambda (move move-list-local)
+                                  (cons (cons (car move) (cons new-pos (cdr move))) move-list-local))
+                                '()
+                                later-moves)
+                              move-list))
+                            move-list))]
+                    ; иначе, если клетка пустая, то можем просто переместиться на нее если kills-only == #f
+                    [(and (not (set-member? my-pieces new-pos)) (eq? kills-only #f)) (cons (list new-pos) move-list)]
+                    ; иначе ход в new-pos мы сделать не можем
+                    [else move-list])
+                  move-list)))
+            '()
+            dirs)))
+        ; если move-list пуст и это не первый ход фишки (kills-only = #t) то нужно оставить ((pos))
+        (if (and (null? move-list) (eq? kills-only #t))
+          (list (list pos))
+          move-list)))
 
-  ; рекурсивная функция, возвращающая список всевозможных ходов в ниже указанном формате
-  ; kills-only - если #t то возвращаются только ходы со взятиями
-  (define (possible-moves-recursive pos kills-only)
-    ; move-list - список всевозможных ходов из позиции pos в виде (end-pos kill1 kill2 ... )
-    (foldl
-        (lambda (dir move-list)
-          (let* ((new-pos (move-in-dir pos dir)))
-            ; проверяем что позиция в пределах доски
-            (if (and (good-pos? new-pos))
-              (cond 
-                ; если в new-pos - фишка противника, то пробуем ее съесть
-                [(set-member? enemy-pieces new-pos)
-                    (let ((new-pos2 (move-in-dir (new-pos dir))))
-                      ; проверяем что результирующая клетка пустая
-                      (if (and (good-pos? new-pos2)
-                               (not (set-member? my-pieces new-pos2))
-                               (not (set-member? enemy-pieces new-pos2)))
-                        ; рекурсивно ищем все ходы из новой позиции только со взятиями
-                        (let ((later-moves (possible-moves-recursive new-pos2 #t)))
-                          ; в каждом из них нужно извлечь cdr - список взятий и car - end-pos
-                          ; к взятиям нужно прибавить kill1 = new-pos, end-pos оставить неизменным
-                          ; и собрать обратно в список вида (end-pos kill1 kill2 ... )
-                          ; и в конце append-нуть все эти ходы к move-list
-                          (append (foldl
-                            (lambda (move move-list-local)
-                              (cons (cons (car move) (cons new-pos (cdr move))) move-list-local))
-                            '()
-                            later-moves)
-                          move-list))
-                        move-list))]
-                ; иначе, если клетка пустая, то можем просто переместиться на нее если kills-only == #f
-                [(and (not (set-member? my-pieces new-pos)) (eq? kills-only #f)) (cons new-pos move-list)]
-                ; иначе ход в new-pos мы сделать не можем
-                [else move-list])
-              move-list)))
-        '()
-        dirs))
-  )
+
+    (let* ((dirs (case dir1
+                   [((1)) '((1 -1) (1 1))]
+                   [((-1)) '((-1 -1) (-1 1))]
+                   [((-1 1)) '((-1 -1) (-1 1) (1 -1) (1 1))])))
+           ; к каждому из ходов нужно прибавть start-pos в начало 
+           (foldl
+             (lambda (move result-move-list)
+               (cons (cons pos move) result-move-list))
+             '()
+             (possible-moves-recursive pos dirs #f))))
+
+  ; тело функции
   (if (eq? (board-s b) 1)
+    ; для черных
     ; выполняем для каждой фишки
-      (foldl
-        (lambda (pos union)
-          (cons pos union))
-        '()
-        (set->list (p1s b)))
-      #f
-))
+    (let ((my-pieces (set-union (p1s b) (q1s b)))
+          (enemy-pieces (set-union (p2s b) (q2s b))))
+      (append 
+        (foldl
+            ; сначала для обычных фишек
+            (lambda (pos union)
+              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(1))
+                     union))
+            '()
+            (set->list (p1s b)))
+        (foldl
+            ; для дамок
+            (lambda (pos union)
+              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(1 -1))))
+            '()
+            (set->list (q1s b)))))
+    ; для белых
+    '())
+)
 
 (define (wins1? b)
   #f)
