@@ -167,9 +167,9 @@
   1))
 
 (define test-board (board
-  (set '(1 1))
   (set)
-  (set '(2 2))
+  (set '(3 3))
+  (set '(2 2) '(2 4))
   (set)
   1))
 
@@ -189,9 +189,11 @@
 
 
 ;; функция эвристической оценки позиции
-(define (f-h s) 0)
-  ; TODO
- 
+(define (f-h s)
+  (-
+  (+ (set-count (p1s s)) (* 2 (set-count (q1s s))))
+  (set-count (p2s s))
+  (* 2 (set-count (q2s s)))))
 
 ; Move (ход) представляет из себя '((a1 b1) (a2 b2) ... (an bn))
 ; Здесь фигура двигается с клетки a1 b1 на клетку a2 b2
@@ -320,18 +322,36 @@
         (foldl
             ; для дамок
             (lambda (pos union)
-              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(1 -1))))
+              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(-1 1))))
             '()
             (set->list (q1s b)))))
     ; для белых
-    '())
+    (let ((my-pieces (set-union (p2s b) (q2s b)))
+          (enemy-pieces (set-union (p1s b) (q1s b))))
+      (append 
+        (foldl
+            ; сначала для обычных фишек
+            (lambda (pos union)
+              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(-1))
+                     union))
+            '()
+            (set->list (p2s b)))
+        (foldl
+            ; для дамок
+            (lambda (pos union)
+              (append (possible-moves-single-checker pos my-pieces enemy-pieces '(-1 1))))
+            '()
+            (set->list (q2s b))))))
+      
 )
 
 (define (wins1? b)
-  #f)
+  (or (and (set-empty? (p2s b)) (set-empty (q2s b)))
+      (and (eq? (board-s b) 2) (null? (possible-moves-checkers b)))))
 
 (define (wins2? b)
-  #f)
+  (or (and (set-empty? (p1s b)) (set-empty (q1s b)))
+      (and (eq? (board-s b) 1) (null? (possible-moves-checkers b)))))
  
 ;; вывод игровой доски в текстовом виде
 (define (show-board b)
