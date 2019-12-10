@@ -182,7 +182,6 @@
 
 
 ;; функция эвристической оценки позиции
-;; из количества линий, открытых для крестиков, вычитается количество линий, открытых для ноликов
 (define (f-h s) 0)
   ; TODO
  
@@ -226,6 +225,82 @@
     )
 ))
 
+; находится ли клетка в пределах доски
+(define (good-pos? pos)
+  (and (<= (car pos) 8)
+       (>= (car pos) 1)
+       (<= (cadr pos) 8)
+       (>= (cadr pos) 1)))
+
+; перещаем фишку в сторону dir (сумма пар)
+(define (move-in-dir pos dir)
+  (list (+ (car pos) (car dir))
+        (+ (cadr pos) (cadr dir))))
+
+(define (possible-moves-checkers b)
+  ; возвращает список возможных ходов для одной фишки
+  ; dir1 - в какую сторону по вертикали может двигаться фишка
+  ; dir1 - (+1), (-1) или (+1 -1) (если дамка)
+  (define (possible-moves-single-checker pos my-pieces enemy-pieces dir1)
+    (let* ((dirs (case dir
+                   [('(1)) '((1 -1) (1 1))]
+                   [('(-1)) '((-1 -1) (-1 1))]
+                   [('(-1 1)) '((-1 -1) (-1 1) (1 -1) (1 1))]))
+           ; перещаемся в каждом из возможных направлений dirs
+           (new-pos-list (foldl
+                (lambda (dir new-pos-list)
+                  (cons (move-in-dir pos dir) new-pos-list))
+                '()
+                dirs))
+
+  ; рекурсивная функция, возвращающая список всевозможных ходов в ниже указанном формате
+  ; kills-only - если #t то возвращаются только ходы со взятиями
+  (define (possible-moves-recursive pos kills-only)
+    ; move-list - список всевозможных ходов из позиции pos в виде (end-pos kill1 kill2 ... )
+    (foldl
+        (lambda (dir move-list)
+          (let* ((new-pos (move-in-dir pos dir)))
+            ; проверяем что позиция в пределах доски
+            (if (and (good-pos? new-pos))
+              (cond 
+                ; если в new-pos - фишка противника, то пробуем ее съесть
+                [(set-member? enemy-pieces new-pos)
+                    (let ((new-pos2 (move-in-dir (new-pos dir))))
+                      ; проверяем что результирующая клетка пустая
+                      (if (and (good-pos? new-pos2)
+                               (not (set-member? my-pieces new-pos2))
+                               (not (set-member? enemy-pieces new-pos2)))
+                        ; рекурсивно ищем все ходы из новой позиции только со взятиями
+                        (let ((later-moves (possible-moves-recursive new-pos2 #t)))
+                          ; в каждом из них нужно извлечь cdr - список взятий и car - end-pos
+                          ; к взятиям нужно прибавить kill1 = new-pos, end-pos оставить неизменным
+                          ; и собрать обратно в список вида (end-pos kill1 kill2 ... )
+                          ; и в конце append-нуть все эти ходы к move-list
+                          (append (foldl
+                            (lambda (move move-list-local)
+                              (cons (cons (car move) (cons new-pos (cdr move))) move-list-local))
+                            '()
+                            later-moves)
+                          move-list))
+                        move-list))]
+                ; иначе, если клетка пустая, то можем просто переместиться на нее если kills-only == #f
+                [(and (not (set-member? my-pieces new-pos)) (eq? kills-only #f)) (cons new-pos move-list)]
+                ; иначе ход в new-pos мы сделать не можем
+                [else move-list])
+              move-list)))
+        '()
+        dirs))
+  )
+  (if (eq? (board-s b) 1)
+    ; выполняем для каждой фишки
+      (foldl
+        (lambda (pos union)
+          (cons pos union))
+        '()
+        (set->list (p1s b)))
+      #f
+))
+
 (define (wins1? b)
   #f)
 
@@ -252,7 +327,7 @@
   (class game%
     (super-new
      [draw-game?       (lambda (b) #f)]
-     [possible-moves   (lambda (b) #f)]
+     [possible-moves   possible-moves-checkers]
      [show-state       show-board])))
  
 ;; описания партнеров для крестиков-ноликов
